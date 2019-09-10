@@ -1,0 +1,74 @@
+---
+title: "Machine learning assignment"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Executive summary
+In this project, we have two sets of data, one for training and one for the validation.
+
+We split the training data into two sets of data - one for training, and one for testing. We shall test three kinds of model - Tree classification using "rpart" method, Linear Discriminant Analysis, and Quadratic Discriminant Analysis. We also have a combined matrix which goes by majority rule - in the case when all three model predictions are different, we take the results with the best out-of-model prediction (in this case the QDA).
+
+We find QDA produces the best out-of-model validation, with the classification rate of 88%. This is better than the combined matrix. With this, we predict the classe in the validation data set.
+
+##Data loading
+
+
+```{r, warning=FALSE}
+remove(list=ls())
+library(tidyverse)
+library(caret)
+traindata<-read.csv("pml-training.csv", stringsAsFactors = FALSE)
+data_validation<-read.csv("pml-testing.csv", stringsAsFactors = FALSE)
+colclass<- sapply(traindata, class)
+colclass[length(colclass)]<-"integer"
+traindata<-cbind(traindata[,!colclass=="character"])
+traindata<-traindata[, colSums(is.na(traindata)) == 0]
+traindata<-traindata[,-(1:4)]
+traindata$classe<-as.factor(traindata$classe)
+
+set.seed(345)
+inTraining <- createDataPartition(traindata$classe, p = .75, list = FALSE)
+training <- traindata[ inTraining,]
+testing  <- traindata[-inTraining,]
+mod_tree <- train( classe ~ ., data = training, method="rpart")
+mod_lda <- train(classe ~ ., data = training, method = "lda")
+mod_qda <- train(classe ~ ., data = training, method = "qda")
+pred_tree <- predict(mod_tree, training)
+pred_lda <- predict(mod_lda, training)
+pred_qda <- predict(mod_qda, training)
+
+sum(pred_tree==training$classe)/nrow(training)
+sum(pred_lda==training$classe)/nrow(training)
+sum(pred_qda==training$classe)/nrow(training)
+
+
+pred_tree_test <- predict(mod_tree, testing)
+pred_lda_test <- predict(mod_lda, testing)
+pred_qda_test <- predict(mod_qda, testing)
+
+sum(pred_tree_test==testing$classe)/nrow(testing)
+sum(pred_lda_test==testing$classe)/nrow(testing)
+sum(pred_qda_test==testing$classe)/nrow(testing)
+combn_test<-data.frame(pred_tree_test, pred_lda_test, pred_qda_test)
+combn_test$prediction<-combn_test$pred_tree_test
+for (i in 1:nrow(combn_test)){
+  if(combn_test[i,1]==combn_test[i,2]){
+    combn_test[i,4]=combn_test[i,1]} else if (combn_test[i,1]==combn_test[i,3]){
+      combn_test[i,4]=combn_test[i,1]} else if (combn_test[i,2]==combn_test[i,3]) {
+        combn_test[i,4]=combn_test[i,2]}else{
+          combn_test[i,4]=combn_test[i,3]}
+}
+
+sum(combn_test$prediction==testing$classe)/nrow(testing)
+
+
+```
+
+It seems like qda prediction is the best, performing better than the combination.
+```{r}
+predict(mod_qda, data_validation)
+```
